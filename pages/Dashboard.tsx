@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axiosInstance';
 import { format } from 'date-fns';
 import {
   DollarSign,
@@ -59,7 +59,7 @@ const Dashboard: React.FC = () => {
         const from = format(new Date(today.getFullYear(), today.getMonth(), 1), 'yyyy-MM-dd');
         const to = format(today, 'yyyy-MM-dd');
 
-        const { data } = await axios.get<SummaryReport>(
+        const { data } = await api.get<SummaryReport>(
           `/api/reports/summary?from=${from}&to=${to}&period=daily`,
           {
             headers: {

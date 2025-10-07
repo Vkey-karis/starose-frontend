@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { Item, Sale } from '../types/index.ts';
 import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import api from '../api/axiosInstance.ts';
 
 // Form to record a new sale
 const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecorded }) => {
@@ -148,7 +149,7 @@ const Sales: React.FC = () => {
         setLoading(true);
         try {
             const config = { headers: { Authorization: `Bearer ${user?.token}` } };
-            const { data } = await axios.get(`/api/sales?page=${page}&itemName=${searchTerm}`, config);
+            const { data } = await api.get(`/sales?page=${page}&itemName=${searchTerm}`, config);
             setSales(data.sales);
             setPages(data.pages);
         } catch (error) {

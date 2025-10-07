@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import toast from 'react-hot-toast';
 import { User } from '../types/index.ts';
+import api from '../api/axiosInstance.ts';
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState('admin@example.com');
@@ -15,7 +16,7 @@ const Login: React.FC = () => {
         e.preventDefault();
         setLoading(true);
         try {
-            const { data } = await axios.post<User>('/api/auth/login', { email, password });
+            const { data } = await api.post<User>('/auth/login', { email, password });
             login(data);
             toast.success('Login successful!');
         } catch (error) {

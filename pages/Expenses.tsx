@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../api/axiosInstance';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import toast from 'react-hot-toast';
 import { Expense } from '../types/index.ts';
@@ -81,7 +81,7 @@ const Expenses: React.FC = () => {
         setLoading(true);
         try {
             const config = { headers: { Authorization: `Bearer ${user?.token}` } };
-            const { data } = await axios.get(`/api/expenses?page=${page}`, config);
+            const { data } = await api.get(`/expenses?page=${page}`, config);
             setExpenses(data.expenses);
             setPages(data.pages);
         } catch (error) {

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import toast from 'react-hot-toast';
 import { Item } from '../types/index.ts';
 import { Plus, Edit, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import api from '../api/axiosInstance.ts';
 
 // Modal component for adding/editing items
 const ItemModal: React.FC<{
@@ -125,7 +125,7 @@ const Inventory: React.FC = () => {
         setLoading(true);
         try {
             const config = { headers: { Authorization: `Bearer ${user?.token}` } };
-            const { data } = await axios.get(`/api/items?page=${page}&keyword=${searchTerm}`, config);
+            const { data } = await api.get(`/items?page=${page}&keyword=${searchTerm}`, config);
             setItems(data.items);
             setPages(data.pages);
         } catch (error) {

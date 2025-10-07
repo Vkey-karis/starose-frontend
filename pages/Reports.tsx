@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { SummaryReport } from '../types/index.ts';
 import { FileDown, BarChart, FileSpreadsheet, FileText } from 'lucide-react';
 import { saveAs } from 'file-saver';
+import api from '../api/axiosInstance.ts';
 
 const StatCard: React.FC<{ title: string; value: string }> = ({ title, value }) => (
   <div className="bg-slate-50 p-4 rounded-lg text-center">
@@ -72,7 +73,7 @@ const Reports: React.FC = () => {
         responseType: 'blob' as const,
       };
 
-      const response = await axios.get(
+      const response = await api.get(
         `/api/reports/export?from=${fromDate}&to=${toDate}&format=${formatType}`,
         config
       );
