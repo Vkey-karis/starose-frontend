@@ -60,7 +60,7 @@ const Dashboard: React.FC = () => {
         const to = format(today, 'yyyy-MM-dd');
 
         const { data } = await api.get<SummaryReport>(
-          `/api/reports/summary?from=${from}&to=${to}&period=daily`,
+          `/reports/summary?from=${from}&to=${to}&period=daily`,
           {
             headers: {
               Authorization: `Bearer ${user.token}`,
