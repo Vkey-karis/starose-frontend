@@ -23,7 +23,7 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
         const fetchItems = async () => {
             try {
                 const config = { headers: { Authorization: `Bearer ${user?.token}` } };
-                const { data } = await axios.get('/api/items?page=1&limit=1000', config); // A bit of a hack to get all items
+                const { data } = await axios.get('/items?page=1&limit=1000', config); // A bit of a hack to get all items
                 setItems(data.items);
             } catch (error) {
                 toast.error("Couldn't load items for sale.");
@@ -60,7 +60,7 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
                 paymentMethod,
                 attendant,
             };
-            await axios.post('/api/sales', saleData, config);
+            await axios.post('/sales', saleData, config);
             toast.success('Sale recorded successfully!');
             
             if (crossesThreshold && selectedItem) {

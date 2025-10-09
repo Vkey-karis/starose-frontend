@@ -40,7 +40,7 @@ const Reports: React.FC = () => {
       };
 
       const { data } = await axios.get<SummaryReport>(
-        `/api/reports/summary?from=${fromDate}&to=${toDate}`,
+        `/reports/summary?from=${fromDate}&to=${toDate}`,
         config
       );
 
@@ -74,7 +74,7 @@ const Reports: React.FC = () => {
       };
 
       const response = await api.get(
-        `/api/reports/export?from=${fromDate}&to=${toDate}&format=${formatType}`,
+        `/reports/export?from=${fromDate}&to=${toDate}&format=${formatType}`,
         config
       );
 

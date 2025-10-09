@@ -35,7 +35,7 @@ const ItemModal: React.FC<{
                     item.quantity > item.lowStockThreshold && // was not low
                     Number(formData.quantity) <= Number(formData.lowStockThreshold); // is now low
 
-                await axios.put(`/api/items/${formData._id}`, formData, config);
+                await axios.put(`/items/${formData._id}`, formData, config);
                 toast.success('Item updated successfully');
 
                 if (crossesThreshold) {
@@ -153,7 +153,7 @@ const Inventory: React.FC = () => {
         if (window.confirm('Are you sure you want to delete this item?')) {
             try {
                 const config = { headers: { Authorization: `Bearer ${user?.token}` } };
-                await axios.delete(`/api/items/${id}`, config);
+                await axios.delete(`/items/${id}`, config);
                 toast.success('Item deleted successfully');
                 fetchItems();
             } catch (error) {
