@@ -10,6 +10,9 @@ import api from '../api/axiosInstance.ts';
 // Form to record a new sale
 const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecorded }) => {
   const [items, setItems] = useState<Item[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedItemId, setSelectedItemId] = useState('');
   const [quantitySold, setQuantitySold] = useState(1);
   const [actualSellingPrice, setActualSellingPrice] = useState(0);
@@ -18,23 +21,43 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
 
-  useEffect(() => {
-    const fetchItems = async () => {
+  const fetchItems = useCallback(
+    async (reset = false) => {
       try {
         const config = { headers: { Authorization: `Bearer ${user?.token}` } };
-        const { data } = await api.get('/items?page=1&limit=1000', config);
-        setItems(data.items);
-      } catch {
+        const { data } = await api.get(`/items?page=${page}&limit=20&search=${searchQuery}`, config);
+
+        if (reset) {
+          setItems(data.items);
+        } else {
+          setItems(prev => [...prev, ...data.items]);
+        }
+
+        setHasMore(data.items.length > 0);
+      } catch (error) {
         toast.error("Couldn't load items for sale.");
       }
-    };
-    fetchItems();
-  }, [user?.token]);
+    },
+    [user?.token, page, searchQuery]
+  );
+
+  useEffect(() => {
+    fetchItems(true);
+  }, [fetchItems]);
+
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    setPage(1);
+  };
+
+  const handleShowMore = () => {
+    setPage(prev => prev + 1);
+  };
 
   const handleItemChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const itemId = e.target.value;
     setSelectedItemId(itemId);
-    const selectedItem = items.find((i) => i._id === itemId);
+    const selectedItem = items.find(i => i._id === itemId);
     if (selectedItem) {
       setActualSellingPrice(selectedItem.defaultSellingPrice);
     }
@@ -44,7 +67,7 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
     e.preventDefault();
     setLoading(true);
 
-    const selectedItem = items.find((i) => i._id === selectedItemId);
+    const selectedItem = items.find(i => i._id === selectedItemId);
     const crossesThreshold =
       selectedItem &&
       selectedItem.quantity > selectedItem.lowStockThreshold &&
@@ -69,7 +92,6 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
         });
       }
 
-      // Reset form
       setSelectedItemId('');
       setQuantitySold(1);
       setActualSellingPrice(0);
@@ -86,7 +108,7 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
     }
   };
 
-  const selectedItem = items.find((i) => i._id === selectedItemId);
+  const selectedItem = items.find(i => i._id === selectedItemId);
   const profitPreview = selectedItem
     ? (actualSellingPrice - selectedItem.buyingPrice) * quantitySold
     : 0;
@@ -98,6 +120,16 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium">Item</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-3 text-slate-400" size={18} />
+              <input
+                type="text"
+                placeholder="Search items..."
+                value={searchQuery}
+                onChange={handleSearch}
+                className="w-full pl-10 pr-4 py-2 mb-2 border border-slate-300 rounded-md focus:ring-primary-500"
+              />
+            </div>
             <select
               value={selectedItemId}
               onChange={handleItemChange}
@@ -105,39 +137,51 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
               className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
             >
               <option value="">Select an item</option>
-              {items.map((item) => (
+              {items.map(item => (
                 <option key={item._id} value={item._id}>
                   {item.name} (In Stock: {item.quantity})
                 </option>
               ))}
             </select>
+            {hasMore && (
+              <button
+                type="button"
+                onClick={handleShowMore}
+                className="mt-2 text-sm text-primary-600 hover:underline"
+              >
+                Show more...
+              </button>
+            )}
           </div>
+
           <div>
             <label className="block text-sm font-medium">Quantity Sold</label>
             <input
               type="number"
               min="1"
               value={quantitySold}
-              onChange={(e) => setQuantitySold(Number(e.target.value))}
+              onChange={e => setQuantitySold(Number(e.target.value))}
               required
               className="mt-1 block w-full rounded-md border-slate-300 shadow-sm"
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium">Actual Selling Price (per item)</label>
             <input
               type="number"
               value={actualSellingPrice}
-              onChange={(e) => setActualSellingPrice(Number(e.target.value))}
+              onChange={e => setActualSellingPrice(Number(e.target.value))}
               required
               className="mt-1 block w-full rounded-md border-slate-300 shadow-sm"
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium">Payment Method</label>
             <select
               value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value as 'Cash' | 'Mpesa')}
+              onChange={e => setPaymentMethod(e.target.value as 'Cash' | 'Mpesa')}
               required
               className="mt-1 block w-full rounded-md border-slate-300 shadow-sm"
             >
@@ -145,16 +189,18 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
               <option>Mpesa</option>
             </select>
           </div>
+
           <div>
             <label className="block text-sm font-medium">Attendant</label>
             <input
               type="text"
               value={attendant}
-              onChange={(e) => setAttendant(e.target.value)}
+              onChange={e => setAttendant(e.target.value)}
               required
               className="mt-1 block w-full rounded-md border-slate-300 shadow-sm"
             />
           </div>
+
           <div className="flex items-end">
             <button
               type="submit"
@@ -165,6 +211,7 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
             </button>
           </div>
         </div>
+
         {selectedItemId && (
           <div className="bg-slate-50 p-3 rounded-md text-sm grid grid-cols-2">
             <p>
@@ -190,7 +237,6 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
   );
 };
 
-// --- Main Sales Component ---
 const Sales: React.FC = () => {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -206,7 +252,7 @@ const Sales: React.FC = () => {
       const { data } = await api.get(`/sales?page=${page}&itemName=${searchTerm}`, config);
       setSales(data.sales);
       setPages(data.pages);
-    } catch {
+    } catch (error) {
       toast.error('Failed to fetch sales records.');
     } finally {
       setLoading(false);
@@ -225,6 +271,7 @@ const Sales: React.FC = () => {
 
       <div className="bg-white p-6 rounded-lg shadow-md mt-8">
         <h2 className="text-xl font-bold text-slate-800 mb-4">Recent Sales</h2>
+
         <div className="relative mb-4">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -234,7 +281,7 @@ const Sales: React.FC = () => {
             type="text"
             placeholder="Search by item name..."
             value={searchTerm}
-            onChange={(e) => {
+            onChange={e => {
               setSearchTerm(e.target.value);
               setPage(1);
             }}
@@ -269,7 +316,7 @@ const Sales: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                sales.map((sale) => (
+                sales.map(sale => (
                   <tr
                     key={sale._id}
                     className="bg-white border-b hover:bg-slate-50"
@@ -302,17 +349,15 @@ const Sales: React.FC = () => {
 
         <div className="flex justify-between items-center mt-4">
           <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page === 1}
             className="flex items-center px-3 py-1 bg-white border border-slate-300 rounded-md disabled:opacity-50"
           >
             <ChevronLeft size={16} className="mr-1" /> Previous
           </button>
-          <span>
-            Page {page} of {pages}
-          </span>
+          <span>Page {page} of {pages}</span>
           <button
-            onClick={() => setPage((p) => Math.min(pages, p + 1))}
+            onClick={() => setPage(p => Math.min(pages, p + 1))}
             disabled={page === pages}
             className="flex items-center px-3 py-1 bg-white border border-slate-300 rounded-md disabled:opacity-50"
           >
