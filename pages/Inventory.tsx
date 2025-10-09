@@ -43,7 +43,7 @@ const ItemModal: React.FC<{
                     });
                 }
             } else {
-                await api.post('/api/items', formData, config);
+                await api.post('/items', formData, config);
                 toast.success('Item added successfully');
                 if (Number(formData.quantity) <= Number(formData.lowStockThreshold)) {
                      toast.error(`${formData.name} was added with low stock!`, {
