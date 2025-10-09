@@ -1,15 +1,16 @@
 // src/api/axiosInstance.ts
 import axios from 'axios';
 
+const API_BASE_URL =
+  import.meta.env.MODE === 'development'
+    ? 'http://localhost:5000/api'
+    : 'https://starose-backend.onrender.com/api'; // <-- notice /api at the end
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
-const API_BASE_URL =
-  import.meta.env.MODE === 'development'
-    ? 'http://localhost:5000/api'
-    : 'https://starose-backend.onrender.com/api';
 
 export default api;
