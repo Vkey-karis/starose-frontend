@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -39,7 +38,7 @@ const Reports: React.FC = () => {
         headers: { Authorization: `Bearer ${user.token}` },
       };
 
-      const { data } = await axios.get<SummaryReport>(
+      const { data } = await api.get<SummaryReport>(
         `/reports/summary?from=${fromDate}&to=${toDate}`,
         config
       );

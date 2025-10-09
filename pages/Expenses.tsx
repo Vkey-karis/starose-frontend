@@ -20,7 +20,7 @@ const AddExpenseForm: React.FC<{ onExpenseAdded: () => void }> = ({ onExpenseAdd
         setLoading(true);
         try {
             const config = { headers: { Authorization: `Bearer ${user?.token}` } };
-            await axios.post('/expenses', { amount: Number(amount), category, description, date }, config);
+            await api.post('/expenses', { amount: Number(amount), category, description, date }, config);
             toast.success('Expense added successfully!');
             setAmount('');
             setDescription('');
