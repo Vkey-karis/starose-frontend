@@ -7,51 +7,62 @@ import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import api from '../api/axiosInstance.ts';
 
-// Form to record a new sale
+// =============================
+// Record Sale Form Component
+// =============================
 const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecorded }) => {
   const [items, setItems] = useState<Item[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedItemId, setSelectedItemId] = useState('');
   const [quantitySold, setQuantitySold] = useState(1);
   const [actualSellingPrice, setActualSellingPrice] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Mpesa'>('Cash');
   const [attendant, setAttendant] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const { user } = useAuth();
 
+  // Fetch items with pagination + search
   const fetchItems = useCallback(
-    async (reset = false) => {
+    async (pageNum = 1, query = '') => {
       try {
         const config = { headers: { Authorization: `Bearer ${user?.token}` } };
-        const { data } = await api.get(`/items?page=${page}&limit=20&search=${searchQuery}`, config);
-
-        if (reset) {
+        const { data } = await api.get(`/items?page=${pageNum}&limit=20&search=${query}`, config);
+        if (pageNum === 1) {
           setItems(data.items);
         } else {
           setItems(prev => [...prev, ...data.items]);
         }
-
         setHasMore(data.items.length > 0);
       } catch (error) {
-        toast.error("Couldn't load items for sale.");
+        toast.error("Couldn't load items.");
       }
     },
-    [user?.token, page, searchQuery]
+    [user?.token]
   );
 
+  // Search debounce
   useEffect(() => {
-    fetchItems(true);
+    const delay = setTimeout(() => {
+      fetchItems(1, searchTerm);
+      setPage(1);
+    }, 500);
+    return () => clearTimeout(delay);
+  }, [searchTerm, fetchItems]);
+
+  // Initial load
+  useEffect(() => {
+    fetchItems();
   }, [fetchItems]);
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-    setPage(1);
-  };
-
-  const handleShowMore = () => {
+  const handleShowMore = async () => {
+    if (!hasMore) return;
+    setLoadingMore(true);
+    await fetchItems(page + 1, searchTerm);
     setPage(prev => prev + 1);
+    setLoadingMore(false);
   };
 
   const handleItemChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -66,7 +77,6 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     const selectedItem = items.find(i => i._id === selectedItemId);
     const crossesThreshold =
       selectedItem &&
@@ -92,6 +102,7 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
         });
       }
 
+      // Reset form
       setSelectedItemId('');
       setQuantitySold(1);
       setActualSellingPrice(0);
@@ -118,18 +129,23 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
       <h2 className="text-xl font-bold text-slate-800 mb-4">Record New Sale</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Search + Dropdown */}
           <div>
             <label className="block text-sm font-medium">Item</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-3 text-slate-400" size={18} />
+            <div className="relative mb-2">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                size={18}
+              />
               <input
                 type="text"
                 placeholder="Search items..."
-                value={searchQuery}
-                onChange={handleSearch}
-                className="w-full pl-10 pr-4 py-2 mb-2 border border-slate-300 rounded-md focus:ring-primary-500"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
+
             <select
               value={selectedItemId}
               onChange={handleItemChange}
@@ -139,17 +155,19 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
               <option value="">Select an item</option>
               {items.map(item => (
                 <option key={item._id} value={item._id}>
-                  {item.name} (In Stock: {item.quantity})
+                  {item.name} (Stock: {item.quantity})
                 </option>
               ))}
             </select>
+
             {hasMore && (
               <button
                 type="button"
                 onClick={handleShowMore}
-                className="mt-2 text-sm text-primary-600 hover:underline"
+                disabled={loadingMore}
+                className="mt-2 text-primary-600 text-sm underline"
               >
-                Show more...
+                {loadingMore ? 'Loading more...' : 'Show more items'}
               </button>
             )}
           </div>
@@ -167,7 +185,9 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
           </div>
 
           <div>
-            <label className="block text-sm font-medium">Actual Selling Price (per item)</label>
+            <label className="block text-sm font-medium">
+              Actual Selling Price (per item)
+            </label>
             <input
               type="number"
               value={actualSellingPrice}
@@ -237,6 +257,9 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
   );
 };
 
+// =============================
+// Sales Page
+// =============================
 const Sales: React.FC = () => {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -355,7 +378,9 @@ const Sales: React.FC = () => {
           >
             <ChevronLeft size={16} className="mr-1" /> Previous
           </button>
-          <span>Page {page} of {pages}</span>
+          <span>
+            Page {page} of {pages}
+          </span>
           <button
             onClick={() => setPage(p => Math.min(pages, p + 1))}
             disabled={page === pages}
