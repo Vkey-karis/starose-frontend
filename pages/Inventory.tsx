@@ -34,7 +34,7 @@ const ItemModal: React.FC<{
                     item && // is an update
                     item.quantity > item.lowStockThreshold && // was not low
                     Number(formData.quantity) <= Number(formData.lowStockThreshold); // is now low
-api            await api.put(`/items/${formData._id}`, formData, config);
+            await api.put(`/items/${formData._id}`, formData, config);
                 toast.success('Item updated successfully');
 
                 if (crossesThreshold) {
