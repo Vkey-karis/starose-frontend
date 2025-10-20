@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext.tsx';
 import toast from 'react-hot-toast';
 import { Item, Sale } from '../types/index.ts';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Loader2 } from 'lucide-react';
 import api from '../api/axiosInstance.ts';
 
 // =============================
@@ -12,46 +12,53 @@ import api from '../api/axiosInstance.ts';
 // =============================
 const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecorded }) => {
   const [items, setItems] = useState<Item[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedItemId, setSelectedItemId] = useState('');
   const [quantitySold, setQuantitySold] = useState(1);
   const [actualSellingPrice, setActualSellingPrice] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Mpesa'>('Cash');
   const [attendant, setAttendant] = useState('');
   const [loading, setLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
   const { user } = useAuth();
 
-  // ✅ Fetch all items in inventory (no pagination or search)
-  const fetchAllItems = useCallback(async () => {
-    try {
-      const config = { headers: { Authorization: `Bearer ${user?.token}` } };
-      const { data } = await api.get('/items', config);
-      setItems(data.items || []);
-    } catch (error) {
-      toast.error("Couldn't load inventory items.");
-    }
-  }, [user?.token]);
-
+  // Debounced search for items
   useEffect(() => {
-    fetchAllItems();
-  }, [fetchAllItems]);
+    const delayDebounce = setTimeout(async () => {
+      if (!searchTerm.trim()) return;
+      setSearchLoading(true);
+      try {
+        const config = { headers: { Authorization: `Bearer ${user?.token}` } };
+        const { data } = await api.get(`/items?search=${searchTerm}&limit=10`, config);
+        setItems(data.items || []);
+      } catch {
+        toast.error("Couldn't fetch items.");
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 400);
 
-  const handleItemChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const itemId = e.target.value;
+    return () => clearTimeout(delayDebounce);
+  }, [searchTerm, user?.token]);
+
+  const handleItemSelect = (itemId: string) => {
     setSelectedItemId(itemId);
-    const selectedItem = items.find(i => i._id === itemId);
-    if (selectedItem) {
-      setActualSellingPrice(selectedItem.defaultSellingPrice);
+    const selected = items.find(i => i._id === itemId);
+    if (selected) {
+      setActualSellingPrice(selected.defaultSellingPrice);
+      setSearchTerm(selected.name);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedItemId) {
+      toast.error('Please select an item.');
+      return;
+    }
+
     setLoading(true);
     const selectedItem = items.find(i => i._id === selectedItemId);
-    const crossesThreshold =
-      selectedItem &&
-      selectedItem.quantity > selectedItem.lowStockThreshold &&
-      selectedItem.quantity - Number(quantitySold) <= selectedItem.lowStockThreshold;
 
     try {
       const config = { headers: { Authorization: `Bearer ${user?.token}` } };
@@ -64,57 +71,74 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
       };
       await api.post('/sales', saleData, config);
       toast.success('Sale recorded successfully!');
+      onSaleRecorded();
 
-      if (crossesThreshold && selectedItem) {
-        const newQuantity = selectedItem.quantity - Number(quantitySold);
-        toast.error(`${selectedItem.name} is now low on stock! Only ${newQuantity} left.`, {
-          icon: '⚠️',
-        });
+      // Warn for low stock
+      if (
+        selectedItem &&
+        selectedItem.quantity > selectedItem.lowStockThreshold &&
+        selectedItem.quantity - quantitySold <= selectedItem.lowStockThreshold
+      ) {
+        toast.error(`${selectedItem.name} is now low on stock!`, { icon: '⚠️' });
       }
 
-      // Reset form
+      // Reset
+      setSearchTerm('');
       setSelectedItemId('');
       setQuantitySold(1);
       setActualSellingPrice(0);
       setAttendant('');
-      onSaleRecorded();
     } catch (error) {
-      const errorMessage =
+      const message =
         axios.isAxiosError(error) && error.response
           ? error.response.data.message
           : 'Failed to record sale.';
-      toast.error(errorMessage);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
   const selectedItem = items.find(i => i._id === selectedItemId);
-  const profitPreview = selectedItem
-    ? (actualSellingPrice - selectedItem.buyingPrice) * quantitySold
-    : 0;
+  const profitPreview =
+    selectedItem && actualSellingPrice && quantitySold
+      ? (actualSellingPrice - selectedItem.buyingPrice) * quantitySold
+      : 0;
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
       <h2 className="text-xl font-bold text-slate-800 mb-4">Record New Sale</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Item Dropdown */}
-          <div>
+          {/* Searchable Item Dropdown */}
+          <div className="relative">
             <label className="block text-sm font-medium">Item</label>
-            <select
-              value={selectedItemId}
-              onChange={handleItemChange}
-              required
-              className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            >
-              <option value="">Select an item</option>
-              {items.map(item => (
-                <option key={item._id} value={item._id}>
-                  {item.name} (Stock: {item.quantity})
-                </option>
-              ))}
-            </select>
+            <input
+              type="text"
+              placeholder="Search for an item..."
+              value={searchTerm}
+              onChange={e => {
+                setSearchTerm(e.target.value);
+                setSelectedItemId('');
+              }}
+              className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:ring-primary-500 focus:border-primary-500"
+            />
+            {searchLoading && (
+              <Loader2 className="absolute top-9 right-3 animate-spin text-slate-400" size={18} />
+            )}
+            {searchTerm && items.length > 0 && !selectedItemId && (
+              <ul className="absolute z-10 bg-white border border-slate-200 mt-1 rounded-md shadow-md max-h-48 overflow-y-auto w-full">
+                {items.map(item => (
+                  <li
+                    key={item._id}
+                    onClick={() => handleItemSelect(item._id)}
+                    className="px-3 py-2 hover:bg-slate-100 cursor-pointer"
+                  >
+                    {item.name} <span className="text-xs text-slate-500">(Stock: {item.quantity})</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div>
@@ -130,9 +154,7 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
           </div>
 
           <div>
-            <label className="block text-sm font-medium">
-              Actual Selling Price (per item)
-            </label>
+            <label className="block text-sm font-medium">Selling Price (each)</label>
             <input
               type="number"
               value={actualSellingPrice}
@@ -147,7 +169,6 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
             <select
               value={paymentMethod}
               onChange={e => setPaymentMethod(e.target.value as 'Cash' | 'Mpesa')}
-              required
               className="mt-1 block w-full rounded-md border-slate-300 shadow-sm"
             >
               <option>Cash</option>
@@ -177,7 +198,7 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
           </div>
         </div>
 
-        {selectedItemId && (
+        {selectedItem && (
           <div className="bg-slate-50 p-3 rounded-md text-sm grid grid-cols-2">
             <p>
               Total Sale:{' '}
@@ -203,7 +224,7 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
 };
 
 // =============================
-// Sales Page
+// Sales Page Component
 // =============================
 const Sales: React.FC = () => {
   const [sales, setSales] = useState<Sale[]>([]);
@@ -220,7 +241,7 @@ const Sales: React.FC = () => {
       const { data } = await api.get(`/sales?page=${page}&itemName=${searchTerm}`, config);
       setSales(data.sales);
       setPages(data.pages);
-    } catch (error) {
+    } catch {
       toast.error('Failed to fetch sales records.');
     } finally {
       setLoading(false);
@@ -240,11 +261,9 @@ const Sales: React.FC = () => {
       <div className="bg-white p-6 rounded-lg shadow-md mt-8">
         <h2 className="text-xl font-bold text-slate-800 mb-4">Recent Sales</h2>
 
+        {/* Search */}
         <div className="relative mb-4">
-          <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            size={20}
-          />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
           <input
             type="text"
             placeholder="Search by item name..."
@@ -257,14 +276,15 @@ const Sales: React.FC = () => {
           />
         </div>
 
+        {/* Sales Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left text-slate-500">
             <thead className="text-xs text-slate-700 uppercase bg-slate-50">
               <tr>
                 <th className="px-6 py-3">Date</th>
-                <th className="px-6 py-3">Item Name</th>
+                <th className="px-6 py-3">Item</th>
                 <th className="px-6 py-3">Qty</th>
-                <th className="px-6 py-3">Total Sale</th>
+                <th className="px-6 py-3">Total</th>
                 <th className="px-6 py-3">Profit</th>
                 <th className="px-6 py-3">Payment</th>
                 <th className="px-6 py-3">Attendant</th>
@@ -285,20 +305,11 @@ const Sales: React.FC = () => {
                 </tr>
               ) : (
                 sales.map(sale => (
-                  <tr
-                    key={sale._id}
-                    className="bg-white border-b hover:bg-slate-50"
-                  >
-                    <td className="px-6 py-4">
-                      {format(new Date(sale.date), 'dd MMM, yyyy HH:mm')}
-                    </td>
-                    <td className="px-6 py-4 font-medium text-slate-900">
-                      {sale.itemName}
-                    </td>
+                  <tr key={sale._id} className="bg-white border-b hover:bg-slate-50">
+                    <td className="px-6 py-4">{format(new Date(sale.date), 'dd MMM, yyyy HH:mm')}</td>
+                    <td className="px-6 py-4 font-medium text-slate-900">{sale.itemName}</td>
                     <td className="px-6 py-4">{sale.quantitySold}</td>
-                    <td className="px-6 py-4">
-                      KES {sale.totalSale.toLocaleString()}
-                    </td>
+                    <td className="px-6 py-4">KES {sale.totalSale.toLocaleString()}</td>
                     <td
                       className={`px-6 py-4 font-bold ${
                         sale.profit >= 0 ? 'text-green-600' : 'text-red-600'
@@ -315,6 +326,7 @@ const Sales: React.FC = () => {
           </table>
         </div>
 
+        {/* Pagination */}
         <div className="flex justify-between items-center mt-4">
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
