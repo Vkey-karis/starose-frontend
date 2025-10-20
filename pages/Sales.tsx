@@ -12,58 +12,28 @@ import api from '../api/axiosInstance.ts';
 // =============================
 const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecorded }) => {
   const [items, setItems] = useState<Item[]>([]);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedItemId, setSelectedItemId] = useState('');
   const [quantitySold, setQuantitySold] = useState(1);
   const [actualSellingPrice, setActualSellingPrice] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Mpesa'>('Cash');
   const [attendant, setAttendant] = useState('');
   const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const { user } = useAuth();
 
-  // Fetch items with pagination + search
-  const fetchItems = useCallback(
-    async (pageNum = 1, query = '') => {
-      try {
-        const config = { headers: { Authorization: `Bearer ${user?.token}` } };
-        const { data } = await api.get(`/items?page=${pageNum}&limit=20&search=${query}`, config);
-        if (pageNum === 1) {
-          setItems(data.items);
-        } else {
-          setItems(prev => [...prev, ...data.items]);
-        }
-        setHasMore(data.items.length > 0);
-      } catch (error) {
-        toast.error("Couldn't load items.");
-      }
-    },
-    [user?.token]
-  );
+  // ✅ Fetch all items in inventory (no pagination or search)
+  const fetchAllItems = useCallback(async () => {
+    try {
+      const config = { headers: { Authorization: `Bearer ${user?.token}` } };
+      const { data } = await api.get('/items', config);
+      setItems(data.items || []);
+    } catch (error) {
+      toast.error("Couldn't load inventory items.");
+    }
+  }, [user?.token]);
 
-  // Search debounce
   useEffect(() => {
-    const delay = setTimeout(() => {
-      fetchItems(1, searchTerm);
-      setPage(1);
-    }, 500);
-    return () => clearTimeout(delay);
-  }, [searchTerm, fetchItems]);
-
-  // Initial load
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
-
-  const handleShowMore = async () => {
-    if (!hasMore) return;
-    setLoadingMore(true);
-    await fetchItems(page + 1, searchTerm);
-    setPage(prev => prev + 1);
-    setLoadingMore(false);
-  };
+    fetchAllItems();
+  }, [fetchAllItems]);
 
   const handleItemChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const itemId = e.target.value;
@@ -129,23 +99,9 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
       <h2 className="text-xl font-bold text-slate-800 mb-4">Record New Sale</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Search + Dropdown */}
+          {/* Item Dropdown */}
           <div>
             <label className="block text-sm font-medium">Item</label>
-            <div className="relative mb-2">
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                size={18}
-              />
-              <input
-                type="text"
-                placeholder="Search items..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-
             <select
               value={selectedItemId}
               onChange={handleItemChange}
@@ -159,17 +115,6 @@ const RecordSaleForm: React.FC<{ onSaleRecorded: () => void }> = ({ onSaleRecord
                 </option>
               ))}
             </select>
-
-            {hasMore && (
-              <button
-                type="button"
-                onClick={handleShowMore}
-                disabled={loadingMore}
-                className="mt-2 text-primary-600 text-sm underline"
-              >
-                {loadingMore ? 'Loading more...' : 'Show more items'}
-              </button>
-            )}
           </div>
 
           <div>
